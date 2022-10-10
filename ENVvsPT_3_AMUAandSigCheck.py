@@ -18,7 +18,7 @@ if platform == "darwin":
     fname = '20220127_ENVvsPT_5_P10_1'   
 elif platform == "linux":
     Sig_path = '/media/shiyi/CIdata/2022_08_22/Results_Data/'
-    results_path = '/media/shiyi/CIdata/2022_08_22/Results_Data/'
+    results_path = '/media/shiyi/CIdata/2022_08_24/Results_Data/'
 # Stimulus waveform    
 if platform == "darwin":
     stimPath = '/Users/fei/Documents/CI_projects/StimData_v1/'
