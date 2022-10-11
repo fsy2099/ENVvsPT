@@ -16,7 +16,7 @@ if platform == "darwin":
     fname = '20220127_ENVvsPT_5_P10_1'   
 elif platform == "linux":
     RawDataPath = '/home/colliculus/ephys/3/0_ENVvsPT/data/2022_08_22/'
-    results_path = '/media/shiyi/CIdata/2022_08_24/Results_Data/'
+    results_path = '/media/shiyi/CIdata/2022_08_22/Results_Data/'
 
 file_names = os.listdir(RawDataPath)
 sig_names = [file_name for file_name in file_names if all([x in file_name for x in [".csv"]])]
