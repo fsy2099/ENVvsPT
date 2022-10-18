@@ -4,6 +4,11 @@
 Created on Wed Aug  3 15:43:22 2022
 
 @author: shiyi
+
+10/18/2022
+Artifact rejection.
+
+
 """
 from sys import platform
 import numpy as np
@@ -12,6 +17,7 @@ import os
 from matplotlib import pyplot as plt
 from numpy.lib.stride_tricks import as_strided
 from scipy.signal import butter, filtfilt, iirnotch, resample_poly, csd, windows, welch, get_window
+import random
 # Recoding signal
 if platform == "darwin":  
     os.chdir('/Users/fei/Documents/CI_projects/20220127_Analysis')
@@ -122,7 +128,7 @@ def CalcSNR(S, F, Fs):
 #%% 
 #position = ['P1']
 file_names = os.listdir(Sig_path)
-sig_names = [file_name for file_name in file_names if all([x in file_name for x in ["_OriginSigArray.npy"]])][0:1]
+sig_names = [file_name for file_name in file_names if all([x in file_name for x in ["_OriginSigArray.npy"]])]
 Fs = 24414.0625
 WienerFilterOrder = 25
 nsamples = int(Fs*0.5)
@@ -140,13 +146,14 @@ for sig_name in sig_names:
     stiITD = [-0.1, 0, 0.1]
     stienvITD = [-0.1, 0, 0.1]
     
-    reject_mark = np.zeros((32, len(stiDur),len(stiITD),len(stienvITD)),dtype = 'float32')
+#    reject_mark = np.zeros((32, len(stiDur),len(stiITD),len(stienvITD)),dtype = 'float32')
     H0_array = np.zeros((32,len(stiDur),len(stiITD),len(stienvITD),WienerFilterOrder+1),dtype = 'float32')
     clean_array = np.zeros((32,len(stiRate),len(stiDur),len(stiITD),len(stienvITD),nsamples,ntrials),dtype = 'float32')
     SF_array = np.zeros((32, len(stiRate),len(stiDur),len(stiITD),len(stienvITD)), dtype = 'float32')
-#    Predict_array = np.zeros((32, len(stiRate),len(stiDur),len(stiITD),len(stienvITD), nsamples))
+    Predict_array = np.zeros((32, len(stiRate),len(stiDur),len(stiITD),len(stienvITD), nsamples))
     fft_array = np.zeros((32, len(stiRate),len(stiDur),len(stiITD),len(stienvITD),int(np.around(Fs/4)), ntrials), dtype = 'float32')
     SNR_array = np.zeros((32, len(stiRate),len(stiDur),len(stiITD),len(stienvITD), ntrials), dtype = 'float32')
+    CleanArtifact = np.zeros((32, len(stiDur),len(stiITD),len(stienvITD), ntrials), dtype = 'float32')
     KaiserWinOrder = 500
     for cc in range(32):
         print('Chan'+str(cc+1))
@@ -196,7 +203,7 @@ for sig_name in sig_names:
                         predict_signal = predict_9[peakidx-12:peakidx+13]
                         clean_signal = original_signal - predict_signal
                         SigArtifact_list.append(np.argmax(np.correlate(predict_signal,original_signal, 'full')))
-                        CleanArtifact_list.append(np.argmax(np.correlate(predict_signal,clean_signal, 'full')))
+                        CleanArtifact[cc, dd, ii, jj, tt] = np.argmax(np.correlate(predict_signal,clean_signal, 'full'))
 #                            use variance to evaluate how clean the signal is 
 #                            x = np.correlate(predict_signal, clean_signal, 'full')
 #                            x = x.astype('float64')
@@ -205,17 +212,18 @@ for sig_name in sig_names:
 #                            y = y.astype('float64')
 #                            y_var = sta.variance(y)
                     H0_array[cc, dd, ii, jj, :] = H0                            
-#                    Predict_array[cc, 0, dd, ii, jj, :Artifact_length] = predict_9[:Artifact_length]
+                    Predict_array[cc, 0, dd, ii, jj, :Artifact_length] = predict_9[:Artifact_length]
                     clean_9 = np.reshape(sig_9-predict_9[:len(sig_9)], (ntrials, nsamples)).T
                     clean_array[cc, 0, dd, ii, jj, :, : ] = clean_9
-                    if not len(np.unique(np.array(SigArtifact_list))) == 1 and np.mean(np.array(SigArtifact_list)) == WienerFilterOrder-1:
-                        reject_mark[cc, dd, ii, jj] = 1
-                        print('H0 unmatched, reject the data')
-                        continue
-                    if not len(np.unique(np.array(CleanArtifact_list))) >= int(ntrials/3):
-                        reject_mark[cc, dd, ii, jj] = 2
-                        print('H0 unmatched, reject the data')
-                        continue                    
+#                    if not len(np.unique(np.array(SigArtifact_list))) == 1 and np.mean(np.array(SigArtifact_list)) == WienerFilterOrder-1:
+#                        reject_mark[cc, dd, ii, jj] = 1
+#                        print('H0 unmatched, reject the data')
+#                        continue
+##                    if not len(np.unique(np.array(CleanArtifact_list))) >= int(ntrials/3):
+#                    if not len(np.unique(CleanArtifact[cc, dd, ii, jj, :])) >= int(ntrials/3):
+#                        reject_mark[cc, dd, ii, jj] = 2
+#                        print('H0 unmatched, reject the data')
+#                        continue                    
                     # 5. use H0 to do artifact rejection on 4500pps
                     sig_45 = concatenation(sig_array[cc, 1, dd, ii, jj, :, :])
                     stim = StimulusData[1, dd, ii, jj, :, 0]
@@ -234,7 +242,7 @@ for sig_name in sig_names:
                     ScaleFactor_45 = CalcSF(np.mean(sig_array[cc, 1, dd, ii, jj, :, :], 1), predict_45, Artifact_length)
                     SF_array[cc, 1, dd, ii, jj] = ScaleFactor_45
                     predict_45 = predict_45*ScaleFactor_45
-#                    Predict_array[cc, 1, dd, ii, jj, :Artifact_length] = predict_45[:Artifact_length]
+                    Predict_array[cc, 1, dd, ii, jj, :Artifact_length] = predict_45[:Artifact_length]
                     clean_45 = np.reshape(sig_45-predict_45[:len(sig_45)], (ntrials, nsamples)).T
                     clean_array[cc, 1, dd, ii, jj, :, : ] = clean_45
                     # 6. calculate post artifact rejection SNR to evaluate how clean the signal is
@@ -246,32 +254,34 @@ for sig_name in sig_names:
 #                        reject_mark[cc, dd, ii, jj] = 3
 #                        print('artifact residue, reject the data')
 #                        continue
-    plt.figure(figsize=(10,15))
-    plt.xticks(np.arange(1, 33, 1))
-    plt.title('reject mark')
-    #plt.subplot(1,2,1)
-    y = 0
-    for dd in range(3):
-        for ii in range(3):
-            for jj in range(3):
-                y = y+1
-                for cc in range(32):
-                    if reject_mark[cc, dd, ii, jj] == 0:                        
-                        plt.plot(cc+1,y, 'ko')
-                    elif reject_mark[cc, dd, ii, jj] == 1:
-                        plt.plot(cc+1,y, 'ro')
-                    elif reject_mark[cc, dd, ii, jj] == 2:
-                        plt.plot(cc+1,y, 'bo')
-                    else:
-                        plt.plot(cc+1,y, 'go')
-    plt.savefig(results_path+sig_name[:-4]+'_reject mark')
-    plt.close('all')
-    np.save(results_path+sig_name[:-4]+'_RejectMark.npy',reject_mark)
+#    plt.figure(figsize=(10,15))
+#    plt.xticks(np.arange(1, 33, 1))
+#    plt.title('reject mark')
+#    #plt.subplot(1,2,1)
+#    y = 0
+#    for dd in range(3):
+#        for ii in range(3):
+#            for jj in range(3):
+#                y = y+1
+#                for cc in range(32):
+#                    if reject_mark[cc, dd, ii, jj] == 0:                        
+#                        plt.plot(cc+1,y, 'ko')
+#                    elif reject_mark[cc, dd, ii, jj] == 1:
+#                        plt.plot(cc+1,y, 'ro')
+#                    elif reject_mark[cc, dd, ii, jj] == 2:
+#                        plt.plot(cc+1,y, 'bo')
+#                    else:
+#                        plt.plot(cc+1,y, 'go')
+#    plt.savefig(results_path+sig_name[:-4]+'_reject mark')
+#    plt.close('all')
+    np.save(results_path+sig_name[:-4]+'_CleanArtifactcCorrPeak.npy',CleanArtifact)
+#    np.save(results_path+sig_name[:-4]+'_RejectMark.npy',reject_mark)
     np.save(results_path+sig_name[:-4]+'_H0.npy',H0_array)
     np.save(results_path+sig_name[:-4]+'_CleanSig.npy',clean_array)
     np.save(results_path+sig_name[:-4]+'_SNR.npy',SNR_array)
     np.save(results_path+sig_name[:-4]+'_ScaleFactor.npy',SF_array)
     np.save(results_path+sig_name[:-4]+'_FFT.npy',fft_array)
+    np.save(results_path+sig_name[:-4]+'_Predict.npy',Predict_array)
 #    ArtifactRejection_dic = {'reject_mark': reject_mark, 'H0_array': H0_array, 'clean_array': clean_array, 'SNR_array': SNR_array, 'SF_array': SF_array, 'fft_array': fft_array, 'Fs': Fs, 'sig_array': sig_array}
 #    np.save(results_path+sig_name[:-4]+'_ArtifactRejected.npy', ArtifactRejection_dic)
 #%%
@@ -279,55 +289,75 @@ stmDur = [0.01, 0.05, 0.2]
 stmRate = [900, 4500]
 stmITD = [-0.1, 0, 0.1]
 stmenvITD = [-0.1, 0, 0.1]
-reject_type = 2
+reject_type = 0
 # 0 is clean, 1 is H0 shape shift, 2 is H0 residual, 3 is SNR residual
 reject_idx = np.array(np.where(reject_mark==reject_type))
-print(reject_idx.shape)
+print(reject_idx.shape[1])
+x = random.sample(range(0, reject_idx.shape[1]), 10)
 #%%
-[cc, dd, ii, jj] = reject_idx[:, 32]
-StimParam = [stiDur[dd], stiITD[ii], stienvITD[jj]]
-print(StimParam)
-#[cc, dd, ii, jj] = [31, 2, 2, 2]
-Artifact_length = int(np.around(Fs*stmDur[dd]))
-tt = 9
-stim_9 = StimulusData[0, dd, ii, jj, :, 0]
-stim_9[stim_9 < 0] = 0
-predict = np.convolve(H0_array[cc, dd, ii, jj, :], stim_9)*SF_array[cc, 0, dd, ii, jj]
-idx = np.argmax(predict[:Artifact_length])
-plt.figure(figsize=(15, 10))
-plt.suptitle(sig_name[:-4]+'_900pps_ch'+str(cc)+'_Dur'+str(stmDur[dd])+'_ptITD'+str(stmITD[ii])+'_envITD'+str(stmenvITD[jj])+'_reject'+str(reject_type))
-
-#plt.subplot(2,2,1)
-#plt.title('clean signal [: artifact length]')
-#clean_sig = clean_array[cc, 0, dd, ii, jj, 2:Artifact_length, :] - clean_array[cc, 0, dd, ii, jj, 2, :]
-#plt.plot(clean_sig)
-
-plt.subplot(2,2,1)
-plt.title('clean signal [maxidx-100:maxidx+100]')
-plt.plot(clean_array[cc, 0, dd, ii, jj, idx-100:idx+100, :]) 
-
-plt.subplot(2,2,2)
-original_sig = sig_array[cc, 0, dd, ii, jj, idx-12:idx+13, :] - sig_array[cc, 0, dd, ii, jj, idx-12, :]
-predict_sig = predict[idx-12:idx+13]
-plt.plot(original_sig[:, tt], 'r-o', label = 'original')
-plt.plot(predict_sig, 'b-o', label = 'predict')
-plt.legend()
-plt.title('original #' + str(tt)+' & predict')
-
-plt.subplot(2,2,3)  
-fft_length = fft_array.shape[-2]
-fre = np.linspace(0,Fs/2,fft_length)
-for x in range(30):
-    plt.plot(fre, fft_array[cc, 0, dd, ii, jj, :, x])
-    plt.xlim([800, 1000])
-    plt.ylim([-0.01, 0.02])
-plt.title('FFT 800~1000Hz')
-
-plt.subplot(2,2,4)
-plt.plot(SNR_array[cc, 0, dd, ii, jj, :], label = '900pps')
-plt.plot(SNR_array[cc, 1, dd, ii, jj, :], label = '4500pps')
-plt.legend()
-plt.title('SNR ratio')
+clean_uni = np.zeros((32, 3, 3, 3))
+for cc in range(32):
+    for dd in range(3):
+        for ii in range(3):
+            for jj in range(3):
+                clean_uni[cc, dd, ii, jj] = len(np.unique(CleanArtifact[cc, dd, ii, jj, :]))
+uni_num = 13
+reject_idx = np.array(np.where(clean_uni==uni_num))
+print(reject_idx.shape[1])
+x = random.sample(range(0, reject_idx.shape[1]), 10)
+#%%
+for xx in x:
+    [cc, dd, ii, jj] = reject_idx[:, xx]
+    StimParam = [stiDur[dd], stiITD[ii], stienvITD[jj]]
+    idx_num = len(np.unique(CleanArtifact[cc, dd, ii, jj, :]))
+    print(StimParam)
+    print(cc, dd, ii, jj)
+    print(idx_num)
+    
+    #[cc, dd, ii, jj] = [31, 2, 2, 2]
+    Artifact_length = int(np.around(Fs*stmDur[dd]))
+    tt = 9
+    stim_9 = StimulusData[0, dd, ii, jj, :, 0]
+    stim_9[stim_9 < 0] = 0
+    predict = np.convolve(H0_array[cc, dd, ii, jj, :], stim_9)*SF_array[cc, 0, dd, ii, jj]
+    idx = np.argmax(predict[:Artifact_length])
+    plt.figure(figsize=(15, 10))
+    plt.suptitle(sig_name[:-4]+'_900pps_ch'+str(cc)+'_Dur'+str(stmDur[dd])+'_ptITD'+str(stmITD[ii])+'_envITD'+str(stmenvITD[jj])+'_reject'+str(reject_type)+' ['+str(cc)+str(dd)+str(ii)+str(jj)+'] '+ str(idx_num))
+        
+    #plt.subplot(2,2,1)
+    #plt.title('clean signal [: artifact length]')
+    #clean_sig = clean_array[cc, 0, dd, ii, jj, 2:Artifact_length, :] - clean_array[cc, 0, dd, ii, jj, 2, :]
+    #plt.plot(clean_sig)
+    
+    plt.subplot(2,2,1)
+    plt.title('clean signal [maxidx-100:maxidx+100]')
+    plt.plot(clean_array[cc, 0, dd, ii, jj, idx-100:idx+100, :]) 
+    
+    plt.subplot(2,2,2)
+    original_sig = sig_array[cc, 0, dd, ii, jj, idx-12:idx+13, :] - sig_array[cc, 0, dd, ii, jj, idx-12, :]
+    plt.plot(original_sig, 'r-o', label = 'original')
+    
+              
+    plt.subplot(2,2,3)
+    original_sig = np.mean(sig_array[cc, 0, dd, ii, jj, idx-12:idx+13, :] - sig_array[cc, 0, dd, ii, jj, idx-12, :], 1)
+    predict_sig = predict[idx-12:idx+13]
+    plt.plot(original_sig, 'r-o', label = 'original')
+    plt.plot(predict_sig, 'b-o', label = 'predict')
+    plt.legend()
+    plt.title('original #' + str(tt)+' & predict')
+#fft_length = fft_array.shape[-2]
+#fre = np.linspace(0,Fs/2,fft_length)
+#for x in range(30):
+#    plt.plot(fre, fft_array[cc, 0, dd, ii, jj, :, x])
+#    plt.xlim([800, 1000])
+#    plt.ylim([-0.01, 0.02])
+#plt.title('FFT 800~1000Hz')
+#
+#plt.subplot(2,2,4)
+#plt.plot(SNR_array[cc, 0, dd, ii, jj, :], label = '900pps')
+#plt.plot(SNR_array[cc, 1, dd, ii, jj, :], label = '4500pps')
+#plt.legend()
+#plt.title('SNR ratio')
 #plt.subplot(2,2,4)
 #original_2 = sig_array[cc, 0, dd, ii, jj, :Artifact_length, :] - sig_array[cc, 0, dd, ii, jj, 0, :]
 #predict_2 = predict[:Artifact_length]

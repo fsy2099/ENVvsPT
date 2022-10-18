@@ -4,6 +4,12 @@
 Created on Tue Aug  2 16:40:41 2022
 
 @author: shiyi
+
+10/17/2022 
+Transfer the original data format (.csv and .ephys) to .npy. 
+The trial number is checked in the code, a dot plot is saved in the results path.
+If the trial number us un-even whithin the stimulus combination, the data should be rejected.
+The output file contain 32 channel sig array (32, 2, 3, 3, 3, 0.5*Fs, ntrials)
 """
 from sys import platform
 import RZ2ephys as ep
