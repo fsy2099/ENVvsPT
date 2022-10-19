@@ -26,6 +26,7 @@ elif platform == "linux":
     stimPath = '/home/colliculus/ephys/4/CIproject/0_ENVvsPTephys/Analysis/'
 StimulusData = np.load(stimPath+'Stim_ENVvsFS_template.npy')
 
+
 #%%   
 def _check_arg(x, xname):
     x = np.asarray(x)
