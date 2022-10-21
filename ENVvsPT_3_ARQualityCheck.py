@@ -42,9 +42,9 @@ SNR_names = [file_name for file_name in file_names if all([x in file_name for x 
 SF_names = [file_name for file_name in file_names if all([x in file_name for x in ["_ScaleFactor.npy"]])]
 FFT_names = [file_name for file_name in file_names if all([x in file_name for x in ["_FFT.npy"]])]
 Predict_names = [file_name for file_name in file_names if all([x in file_name for x in ["Predict.npy"]])]
-#%%
-x = 1
-sig_name = FFT_names[0][:-23]
+#%% load test data to have H0 threshold
+x = 3
+sig_name = FFT_names[x][:-23]
 sig_array = np.load(results_path+origin_names[x])
 corr_array = np.load(results_path+corr_names[x])
 H0_array = np.load(results_path+H0_names[x])
@@ -53,7 +53,8 @@ SNR_array = np.load(results_path+SNR_names[x])
 SF_array = np.load(results_path+SF_names[x])
 FFT_array = np.load(results_path+FFT_names[x])
 Predict_array = np.load(results_path+Predict_names[x])
-#%%
+
+# set specific threshold to filt unmatch H0 results and set reject mark as 1
 reject_mark = np.zeros((32, 3, 3, 3))
 clean_uni = np.zeros((32, 3, 3, 3))
 uni_num = 13
@@ -65,48 +66,20 @@ for cc in range(32):
                 clean_uni[cc, dd, ii, jj] = x
                 if x <= uni_num:
                     reject_mark[cc, dd, ii, jj] = 1
-#%%
-reject_idx = np.array(np.where(clean_uni==uni_num))
-print(reject_idx.shape[1])
-x = random.sample(range(0, reject_idx.shape[1]), 10)
-#%%
-plt.figure(figsize=(10,15))
-plt.xticks(np.arange(1, 33, 1))
-plt.title('reject mark')
-#plt.subplot(1,2,1)
-y = 0
-for dd in range(3):
-    for ii in range(3):
-        for jj in range(3):
-            y = y+1
-            for cc in range(32):
-                if reject_mark[cc, dd, ii, jj] == 0:                        
-                    plt.plot(cc+1,y, 'ko')
-                elif reject_mark[cc, dd, ii, jj] == 1:
-                    plt.plot(cc+1,y, 'ro')
-                elif reject_mark[cc, dd, ii, jj] == 2:
-                    plt.plot(cc+1,y, 'bo')
-                else:
-                    plt.plot(cc+1,y, 'go')
-#%%
-accept_idx = np.array(np.where(reject_mark==0))
-reject_idx = np.array(np.where(reject_mark==1))
-for x in range(reject_idx.shape[-1]):
-    [cc, dd, ii, jj] = reject_idx[:, x]
-    SNR_array[cc, :, dd, ii, jj, :] = 0
-    
-Y = SNR_array[cc, 0, 0, ii, jj, :]
-avg = sum(Y)/len(np.nonzero(Y)[0])                    
-#%%
-for xx in x:
-    [cc, dd, ii, jj] = reject_idx[:, xx]
+idx_test = np.array(np.where(clean_uni==uni_num))
+#%%                    
+idx_random = random.sample(range(0, idx_test.shape[1]), 10)
+for xx in idx_random:
+#for xx in reject:
+#    [cc, dd, ii, jj] = reject_idx[:, xx]
+    [cc, dd, ii, jj] = idx_test[:, xx]
     StimParam = [stiDur[dd], stiITD[ii], stienvITD[jj]]
     idx_num = len(np.unique(corr_array[cc, dd, ii, jj, :]))
     print(StimParam)
     print(cc, dd, ii, jj)
 #    print(idx_num)
     
-    #[cc, dd, ii, jj] = [31, 2, 2, 2]
+    #[cc, dd, ii, jAbstract j] = [31, 2, 2, 2]
     Artifact_length = int(np.around(Fs*stiDur[dd]))
     tt = 9
     stim_9 = StimulusData[0, dd, ii, jj, :, 0]
@@ -132,12 +105,6 @@ for xx in x:
     plt.plot(original_sig, 'r-o', label = 'original')
     plt.plot(predict_sig, 'b-o', label = 'predict')
     plt.plot(original_mean, 'g-o', label = 'mean')
-    
-    SNR_9 = np.mean(SNR_array[cc, 0, dd, ii, jj, :], -1)
-    SNR_45 = np.mean(SNR_array[cc, 1, dd, ii, jj, :], -1)
-    print(SNR_9)
-    print(SNR_45)
-    
                   
     plt.subplot(2,2,3)
     fft_length = FFT_array.shape[-2]
@@ -146,7 +113,47 @@ for xx in x:
     plt.xlim([800, 1000])
     plt.ylim([-0.01, 0.02])
     plt.title('FFT 800~1000Hz')
-                 
+#%%
+
+#%%
+accept_idx = np.array(np.where(reject_mark==0))
+reject_idx = np.array(np.where(reject_mark==1))
+reject = random.sample(range(0, reject_idx.shape[1]), 10)
+accept = random.sample(range(0, accept_idx.shape[1]), 10)                    
+#%% plot reject mark
+plt.figure(figsize=(10,15))
+plt.xticks(np.arange(1, 33, 1))
+plt.title('reject mark')
+#plt.subplot(1,2,1)
+y = 0
+for dd in range(3):
+    for ii in range(3):
+        for jj in range(3):
+            y = y+1
+            for cc in range(32):
+                if reject_mark[cc, dd, ii, jj] == 0:                        
+                    plt.plot(cc+1,y, 'ko')
+                elif reject_mark[cc, dd, ii, jj] == 1:
+                    plt.plot(cc+1,y, 'ro')
+                elif reject_mark[cc, dd, ii, jj] == 2:
+                    plt.plot(cc+1,y, 'bo')
+                else:
+                    plt.plot(cc+1,y, 'go')
+#%%
+
+
+#%%
+for x in range(reject_idx.shape[-1]):
+    [cc, dd, ii, jj] = reject_idx[:, x]
+    SNR_array[cc, :, dd, ii, jj, :] = 0
+
+avg_array = np.zeros((2, 3))
+for ff in range(2):
+    for dd in range(3):        
+        Y = SNR_array[:, ff, dd, :, :, :]
+        b = np.reshape(Y, (np.product(Y.shape),1))
+        avg_array[ff, dd] = sum(b)/len(np.nonzero(b)[0])                    
+
     
     
     
